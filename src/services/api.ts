@@ -32,7 +32,8 @@ export interface AnalysisResponse {
 
 export async function analyzeWebsite(url: string, text?: string): Promise<AnalysisResponse> {
   try {
-    const response = await fetch('http://localhost:3001/api/analyze', {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${API_BASE}/api/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

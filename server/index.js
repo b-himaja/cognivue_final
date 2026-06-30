@@ -124,8 +124,8 @@ async function scrapeAndAnalyze(url) {
     // await ensureScreenshotDir();
     
 browser = await puppeteer.launch({
-  headless: 'new', //  run in visible mode to bypass bot detection
-  executablePath: '/usr/bin/google-chrome',
+  headless: 'new',
+  ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
