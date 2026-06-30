@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Eye, AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, AlertCircle } from 'lucide-react';
 import UrlInputForm from './components/UrlInputForm';
 import Results from './components/Results';
 import { analyzeWebsite, AnalysisResponse } from './services/api';
