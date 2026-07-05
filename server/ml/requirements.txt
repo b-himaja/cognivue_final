@@ -1,4 +1,4 @@
 joblib
 numpy
 scikit-learn
-sentence-transformers
+# sentence-transformers  # uncomment and set USE_TFIDF=false to use the original BERT model
