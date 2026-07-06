@@ -328,11 +328,20 @@ try {
   const { exec } = require("child_process");
   const scriptPath = path.join(__dirname, "ml", "predict.py");
 
+  // Prioritise high-signal UI elements (buttons, banners, modals) since that
+  // is where dark patterns appear and what the model was trained on.
+  // Fall back to the first 500 chars of body text if those are empty.
+  const uiText = [
+    ...results.domData.buttons,
+    ...results.domData.banners,
+    ...results.domData.modals,
+  ].filter(Boolean).join(' | ');
+
   const inputText =
     (text && text.trim()) ||
-    (results.domData && results.domData.textContent
-      ? results.domData.textContent.slice(0, 2000)
-      : "");
+    (uiText.length > 0
+      ? uiText.slice(0, 2000)
+      : results.domData.textContent.slice(0, 500));
 
   if (!inputText || inputText.length === 0) {
     results.mlPrediction = { error: "No text to analyze" };
