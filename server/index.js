@@ -83,13 +83,20 @@ function analyzeTextForPatterns(text) {
 
   const lowerText = text.toLowerCase();
 
-  // Check for each pattern type
+  // Check for each pattern type — deduplicate so the same phrase only counts once
   Object.keys(darkPatterns).forEach(patternType => {
+    const seen = new Set();
     darkPatterns[patternType].forEach(pattern => {
       const regex = new RegExp(pattern, 'gi');
       const matches = lowerText.match(regex);
       if (matches) {
-        results[patternType].push(...matches);
+        matches.forEach(m => {
+          const key = m.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            results[patternType].push(m);
+          }
+        });
       }
     });
   });
@@ -408,15 +415,12 @@ if (results.mlPrediction && results.mlPrediction.confidence) {
   mlBoost += Math.min(results.mlPrediction.confidence / 2, 0.5); // up to +0.5 boost
 }
 
-// Adjusted text complexity (less text = stronger impact)
-const textFactor = Math.max(0.7, 1 - results.analysis.textLength / 8000);
-
 //Final overall trust score (1–5)
 results.overallScore = Math.max(
   1,
   Math.min(
     5,
-    5 - (normalizationFactor * 4 * mlBoost * textFactor)
+    5 - (normalizationFactor * 4 * mlBoost)
   )
 );
 
