@@ -3,6 +3,7 @@ import joblib
 import json
 import numpy as np
 import os
+import re
 
 USE_TFIDF = os.environ.get("USE_TFIDF", "true").lower() == "true"
 
@@ -12,13 +13,22 @@ if not text:
     sys.exit(1)
 
 if USE_TFIDF:
-    # Lightweight TF-IDF model (~250KB, no heavy dependencies)
     vectorizer = joblib.load("ml/models/tfidf_vectorizer.pkl")
     model = joblib.load("ml/models/multilabel_model.pkl")
     mlb = joblib.load("ml/models/label_binarizer.pkl")
 
-    X = vectorizer.transform([text])
-    y_pred_probs = model.predict_proba(X)[0]
+    # Split into short segments so each chunk resembles the training snippets.
+    # Taking the max probability per class across all segments gives the
+    # most-severe signal from the page rather than a diluted average.
+    segments = [s.strip() for s in re.split(r'[.!?\n]+', text) if len(s.strip()) > 3]
+    if not segments:
+        segments = [text]
+
+    X_all = vectorizer.transform(segments)
+    # shape: (n_segments, n_classes) — take column-wise max
+    y_probs_matrix = model.predict_proba(X_all)
+    y_pred_probs = np.max(y_probs_matrix, axis=0)
+
 else:
     # Original sentence-transformers model (~88MB, requires sentence-transformers)
     embedding_model = joblib.load("ml/models/embedding_model.pkl")
