@@ -233,7 +233,11 @@ async function scrapeAndAnalyze(url) {
       ...domData.shortLabels,
     ].join(' ');
 
+    console.log(`[SCRAPE] textLength=${allText.length} buttons=${domData.buttons.length} banners=${domData.banners.length} modals=${domData.modals.length} shortLabels=${domData.shortLabels.length}`);
+    console.log(`[SCRAPE] textSample=${allText.slice(0, 300).replace(/\n/g, ' ')}`);
+
     const darkPatternResults = analyzeTextForPatterns(allText);
+    console.log(`[RULES] urgency=${darkPatternResults.urgency.length} scarcity=${darkPatternResults.scarcity.length} confirmShaming=${darkPatternResults.confirmShaming.length} defaultOptIns=${darkPatternResults.defaultOptIns.length}`);
     const persuasiveLanguage = extractPersuasiveLanguage(allText);
     const checkedByDefault = domData.formElements.filter(el => el.checked && el.type === 'checkbox').length;
 
@@ -335,10 +339,12 @@ app.post('/api/analyze', async (req, res) => {
       if (!inputText || inputText.length === 0) {
         results.mlPrediction = { error: 'No text to analyze' };
       } else {
+        console.log(`[ML] inputLength=${inputText.length} sample="${inputText.slice(0, 200).replace(/\n/g,' ')}"`);
         console.log('Sending text to ML model...');
         const mlStart = Date.now();
         const mlResult = await runMLPrediction(inputText);
         console.log(`[${new Date().toISOString()}] ML prediction finished in ${Date.now() - mlStart} ms`);
+        console.log(`[ML] result=${JSON.stringify(mlResult?.mlPrediction?.detectedPatterns)}`);
 
         if (mlResult?.mlPrediction && Array.isArray(mlResult.mlPrediction.detectedPatterns)) {
           const detectedPatterns = mlResult.mlPrediction.detectedPatterns;
