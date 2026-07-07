@@ -325,7 +325,7 @@ app.post("/api/analyze", async (req, res) => {
 
 // === Integrate Python Multi-Pattern ML Model ===
 try {
-  const { exec } = require("child_process");
+  const { execFile } = require("child_process");
   const scriptPath = path.join(__dirname, "ml", "predict.py");
 
   // Prioritise high-signal UI elements (buttons, banners, modals) since that
@@ -335,7 +335,7 @@ try {
     ...results.domData.buttons,
     ...results.domData.banners,
     ...results.domData.modals,
-  ].filter(Boolean).join(' | ');
+  ].filter(Boolean).join(' ');
 
   const inputText =
     (text && text.trim()) ||
@@ -346,13 +346,10 @@ try {
   if (!inputText || inputText.length === 0) {
     results.mlPrediction = { error: "No text to analyze" };
   } else {
-    const command = `python3 "${scriptPath}" "${inputText.replace(/"/g, '\\"')}"`;
     console.log("Sending text to ML model...");
     const mlStart = Date.now();
     const mlResult = await new Promise((resolve, reject) => {
-
-
-      exec(command, (error, stdout, stderr) => {
+      execFile('python3', [scriptPath, inputText], (error, stdout, stderr) => {
         if (error) {
           console.error("Python error:", stderr);
           return reject(new Error("ML prediction failed"));
@@ -492,14 +489,10 @@ app.post("/api/predict", async (req, res) => {
       return res.status(400).json({ error: "Text is required" });
     }
 
-    // Run the Python prediction script
-    const { exec } = require("child_process");
-    const path = require("path");
-
+    const { execFile } = require("child_process");
     const scriptPath = path.join(__dirname, "ml", "predict.py");
-    const command = `python3 "${scriptPath}" "${text.replace(/"/g, '\\"')}"`;
 
-    exec(command, (error, stdout, stderr) => {
+    execFile('python3', [scriptPath, text], (error, stdout, stderr) => {
       if (error) {
         console.error("Python error:", stderr);
         return res.status(500).json({ error: "Prediction failed" });
