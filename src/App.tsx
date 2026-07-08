@@ -37,12 +37,12 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAnalyze = async (url: string) => {
+  const handleAnalyze = async (url: string, text?: string, textOnly?: boolean) => {
     setIsAnalyzing(true);
     setError(null);
-    
+
     try {
-      const response: AnalysisResponse = await analyzeWebsite(url);
+      const response: AnalysisResponse = await analyzeWebsite(url, text, textOnly);
 
       
       if (!response.success || !response.data) {

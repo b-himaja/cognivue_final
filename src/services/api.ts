@@ -30,7 +30,7 @@ export interface AnalysisResponse {
   error?: string;
 }
 
-export async function analyzeWebsite(url: string, text?: string): Promise<AnalysisResponse> {
+export async function analyzeWebsite(url: string, text?: string, textOnly?: boolean): Promise<AnalysisResponse> {
   try {
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const response = await fetch(`${API_BASE}/api/analyze`, {
@@ -38,8 +38,7 @@ export async function analyzeWebsite(url: string, text?: string): Promise<Analys
       headers: {
         'Content-Type': 'application/json',
       },
-      // send both url and text
-      body: JSON.stringify({ url, text }),
+      body: JSON.stringify({ url, text, textOnly }),
     });
 
     if (!response.ok) {

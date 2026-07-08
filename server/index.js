@@ -280,17 +280,7 @@ async function scrapeAndAnalyze(url) {
 
     const totalPatterns = Object.values(darkPatternResults).flat().length;
 
-    const insights = [];
-    if (darkPatternResults.urgency.length > 0)
-      insights.push(`Found ${darkPatternResults.urgency.length} urgency-based phrases that may pressure users into quick decisions.`);
-    if (darkPatternResults.scarcity.length > 0)
-      insights.push(`Detected ${darkPatternResults.scarcity.length} scarcity indicators that may create a false sense of limited availability.`);
-    if (darkPatternResults.confirmShaming.length > 0)
-      insights.push(`Identified ${darkPatternResults.confirmShaming.length} instances of confirm shaming in decline options.`);
-    if (checkedByDefault > 0)
-      insights.push(`Found ${checkedByDefault} checkbox(es) pre-selected by default, potentially leading to unwanted subscriptions.`);
-    if (darkPatternResults.defaultOptIns.length > 0)
-      insights.push(`Detected ${darkPatternResults.defaultOptIns.length} auto-renewal or default opt-in phrase(s).`);
+    const insights = buildInsights(darkPatternResults, checkedByDefault);
 
     return {
       url: domData.url,
@@ -339,27 +329,71 @@ function runMLPrediction(inputText) {
   });
 }
 
+// ─── Shared scoring logic ─────────────────────────────────────────────────────
+function buildInsights(darkPatternResults, checkedByDefault) {
+  const insights = [];
+  if (darkPatternResults.urgency.length > 0)
+    insights.push(`Found ${darkPatternResults.urgency.length} urgency-based phrases that may pressure users into quick decisions.`);
+  if (darkPatternResults.scarcity.length > 0)
+    insights.push(`Detected ${darkPatternResults.scarcity.length} scarcity indicators that may create a false sense of limited availability.`);
+  if (darkPatternResults.confirmShaming.length > 0)
+    insights.push(`Identified ${darkPatternResults.confirmShaming.length} instances of confirm shaming in decline options.`);
+  if (checkedByDefault > 0)
+    insights.push(`Found ${checkedByDefault} checkbox(es) pre-selected by default, potentially leading to unwanted subscriptions.`);
+  if (darkPatternResults.defaultOptIns.length > 0)
+    insights.push(`Detected ${darkPatternResults.defaultOptIns.length} auto-renewal or default opt-in phrase(s).`);
+  return insights;
+}
+
 // ─── /api/analyze ─────────────────────────────────────────────────────────────
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { url, text } = req.body;
-    console.log('Analyzing:', url);
+    const { url, text, textOnly } = req.body;
     const startTime = Date.now();
 
-    const results = await scrapeAndAnalyze(url);
-    console.log(`[${new Date().toISOString()}] Scraping completed in ${Date.now() - startTime} ms`);
+    let results;
+    let inputText;
 
-    // ML input: prioritise high-signal UI elements (close to training data format)
-    const uiText = [
-      ...results.domData.buttons,
-      ...results.domData.banners,
-      ...results.domData.modals,
-      ...results.domData.shortLabels,
-    ].filter(Boolean).join(' ');
+    if (textOnly && text && text.trim()) {
+      // ── Text-only mode: skip scraping, analyse the provided text directly ──
+      console.log('Text-only analysis mode');
+      const darkPatternResults = analyzeTextForPatterns(text);
+      console.log(`[RULES] urgency=${darkPatternResults.urgency.length} scarcity=${darkPatternResults.scarcity.length} confirmShaming=${darkPatternResults.confirmShaming.length} defaultOptIns=${darkPatternResults.defaultOptIns.length}`);
+      const persuasiveLanguage = extractPersuasiveLanguage(text);
+      const patternScores = {
+        urgency:        Math.min(darkPatternResults.urgency.length * 20, 100),
+        scarcity:       Math.min(darkPatternResults.scarcity.length * 25, 100),
+        confirmShaming: Math.min(darkPatternResults.confirmShaming.length * 30, 100),
+        defaultOptIns:  Math.min(darkPatternResults.defaultOptIns.length * 25, 100),
+      };
+      results = {
+        url: url || 'text-analysis',
+        title: 'Text Analysis',
+        overallScore: 0,
+        riskLevel: 'undetermined',
+        darkPatterns: darkPatternResults,
+        persuasiveLanguage,
+        patternScores,
+        insights: buildInsights(darkPatternResults, 0),
+        domData: { textContent: text, buttons: [], formElements: [], modals: [], banners: [], shortLabels: [] },
+        analysis: { totalPatterns: Object.values(darkPatternResults).flat().length, checkedByDefault: 0, textLength: text.length },
+      };
+      inputText = text.slice(0, 2000);
+    } else {
+      // ── Normal scraping mode ──────────────────────────────────────────────
+      console.log('Analyzing:', url);
+      results = await scrapeAndAnalyze(url);
+      console.log(`[${new Date().toISOString()}] Scraping completed in ${Date.now() - startTime} ms`);
 
-    const inputText =
-      (text && text.trim()) ||
-      (uiText.length > 0 ? uiText.slice(0, 2000) : results.domData.textContent.slice(0, 500));
+      const uiText = [
+        ...results.domData.buttons,
+        ...results.domData.banners,
+        ...results.domData.modals,
+        ...results.domData.shortLabels,
+      ].filter(Boolean).join(' ');
+      inputText = (text && text.trim()) ||
+        (uiText.length > 0 ? uiText.slice(0, 2000) : results.domData.textContent.slice(0, 500));
+    }
 
     try {
       if (!inputText || inputText.length === 0) {
