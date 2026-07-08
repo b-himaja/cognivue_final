@@ -118,6 +118,27 @@ function extractPersuasiveLanguage(text) {
   return { emotionalWords, actionVerbs, superlatives };
 }
 
+// ─── Bot-block detection ──────────────────────────────────────────────────────
+const BLOCK_PAGE_PATTERNS = [
+  /something went wrong/i,
+  /please contact your administrator/i,
+  /access denied/i,
+  /access to this page has been denied/i,
+  /are you a human/i,
+  /unusual traffic/i,
+  /verify you are a human/i,
+  /captcha/i,
+  /request blocked/i,
+  /reference id/i,
+];
+
+function isBlockPage(text, domData) {
+  const trimmed = (text || '').trim();
+  if (trimmed.length < 500 && BLOCK_PAGE_PATTERNS.some(p => p.test(trimmed))) return true;
+  if (trimmed.length < 100 && domData.buttons.length === 0 && domData.formElements.length === 0) return true;
+  return false;
+}
+
 // ─── Scraping ─────────────────────────────────────────────────────────────────
 async function scrapeAndAnalyze(url) {
   let browser;
@@ -235,6 +256,11 @@ async function scrapeAndAnalyze(url) {
 
     console.log(`[SCRAPE] textLength=${allText.length} buttons=${domData.buttons.length} banners=${domData.banners.length} modals=${domData.modals.length} shortLabels=${domData.shortLabels.length}`);
     console.log(`[SCRAPE] textSample=${allText.slice(0, 300).replace(/\n/g, ' ')}`);
+
+    if (isBlockPage(allText, domData)) {
+      console.warn(`[SCRAPE] Detected bot-protection block page for ${url}`);
+      throw new Error('BLOCKED_BY_SITE');
+    }
 
     const darkPatternResults = analyzeTextForPatterns(allText);
     console.log(`[RULES] urgency=${darkPatternResults.urgency.length} scarcity=${darkPatternResults.scarcity.length} confirmShaming=${darkPatternResults.confirmShaming.length} defaultOptIns=${darkPatternResults.defaultOptIns.length}`);
@@ -417,6 +443,12 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error('Error in /api/analyze:', error);
+    if (error.message.includes('BLOCKED_BY_SITE')) {
+      return res.status(200).json({
+        success: false,
+        error: 'This site appears to be blocking automated access (bot/WAF protection). Cognivue could not retrieve real page content to analyze.',
+      });
+    }
     res.status(500).json({ success: false, error: 'Analysis failed' });
   }
 });
